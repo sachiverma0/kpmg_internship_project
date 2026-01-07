@@ -1,4 +1,4 @@
-# ChatGPT-like AI Interface
+# ChatGPT-like AI Interface (Disregard read me for now) 
 
 A modern, full-stack chat interface with pluggable AI backend integration. Built with React and Node.js/Express.
 
