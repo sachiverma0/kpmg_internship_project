@@ -6,6 +6,7 @@ import { sendMessageToAI } from './services/api';
 function App() {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
+  const [selectedColor, setSelectedColor] = useState('blue');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
@@ -26,6 +27,7 @@ function App() {
       id: Date.now(),
       role: 'user',
       content: inputMessage,
+      color: selectedColor,
       timestamp: new Date().toISOString()
     };
 
@@ -99,6 +101,21 @@ function App() {
           )}
           
           <div ref={messagesEndRef} />
+        </div>
+
+        <div className="color-selector-container">
+          <div className="color-selector-label">Your icon color:</div>
+          {['red','orange','yellow','green','blue','purple','pink'].map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`color-swatch ${selectedColor === c ? 'selected' : ''}`}
+              onClick={() => setSelectedColor(c)}
+              aria-label={`Select ${c}`}
+            >
+              <span className={`swatch-circle ${c}`}></span>
+            </button>
+          ))}
         </div>
 
         <form onSubmit={handleSendMessage} className="input-container">
