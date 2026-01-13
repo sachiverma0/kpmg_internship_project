@@ -334,9 +334,10 @@
 }
 
 .message-input:focus {
-  border-color: #A7A8D9;
-  background-color: #002b73; /* lightens to surrounding color on focus */
-  box-shadow: 0 6px 20px rgba(0,0,0,0.5) inset;
+  /* keep the same subtle border on focus to avoid a white border flash */
+  border-color: rgba(255,255,255,0.08);
+  background-color: #002560; /* slightly lighter blue between default and #002b73 */
+  box-shadow: none;
 }
 
 .message-input:disabled {

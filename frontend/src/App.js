@@ -130,25 +130,12 @@ function App() {
               type="button"
               className="settings-button"
               onClick={() => setShowSettings(s => !s)}
-              aria-label="Settings"
+              aria-label="Help"
             >
-              ⚙️
+              ?
             </button>
             <div ref={settingsRef} className={`settings-dropdown ${showSettings ? 'open' : ''}`}>
-              <div className="color-selector-container">
-                <div className="color-selector-label">Your icon color:</div>
-                {['red','orange','yellow','green','blue','purple','pink'].map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className={`color-swatch ${selectedColor === c ? 'selected' : ''}`}
-                    onClick={() => { setSelectedColor(c); setShowSettings(false); }}
-                    aria-label={`Select ${c}`}
-                  >
-                    <span className={`swatch-circle ${c}`}></span>
-                  </button>
-                ))}
-              </div>
+              <div className="settings-placeholder">Settings</div>
             </div>
           </div>
         </div>
