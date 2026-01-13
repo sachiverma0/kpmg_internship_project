@@ -12,13 +12,12 @@ function ChatMessage({ message }) {
     purple: '#8b5cf6',
     pink: '#ec4899'
   };
-  const avatarStyle = isUser ? { backgroundColor: colorMap[message.color] || '#565869' } : {};
+  const avatarStyle = isUser
+    ? { backgroundColor: colorMap[message.color] || '#565869', color: '#ffffff' }
+    : { backgroundColor: '#343541', color: '#ffffff' };
   
   return (
     <div className={`chat-message ${isUser ? 'user-message' : 'assistant-message'} ${message.isError ? 'error-message' : ''}`}>
-      <div className="message-avatar">
-        <div style={avatarStyle} className="avatar-inner">{isUser ? '👤' : '🤖'}</div>
-      </div>
       <div className="message-content">
         <div className="message-role">
           {isUser ? 'You' : 'AI Assistant'}

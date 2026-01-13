@@ -117,7 +117,10 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>KPMG Client Compliance Tool</h1>
+        <div className="header-left">
+          <img src="/kpmg_logo.png" alt="KPMG" className="header-logo" />
+          <span className="header-title">Client Compliance Tool</span>
+        </div>
         <div className="header-actions">
           <button onClick={handleClearChat} className="clear-button">
             Clear Chat
@@ -160,7 +163,7 @@ function App() {
               onClick={() => setSidebarCollapsed(s => !s)}
               aria-label="Toggle sidebar"
             >
-              {sidebarCollapsed ? '➤' : '◀'}
+              ◀
             </button>
           </div>
 
