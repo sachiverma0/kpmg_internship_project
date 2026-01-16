@@ -1,8 +1,8 @@
 
-# requirements.txt
 flask
 flask-cors
 python-dotenv
 openai>=1.0.0
 azure-storage-queue
-azure-cosmos
+pandas
+openpyxl

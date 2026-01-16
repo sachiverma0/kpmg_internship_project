@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './App.css';
 import ChatMessage from './components/ChatMessage';
-import { sendMessageToAI } from './services/api';
-
+//
+import { sendMessageToAI, uploadExcelFile, ragQuery } from './services/api';
+//
 function App() {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -34,7 +35,30 @@ function App() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showSettings]);
+//
 
+  const handleClientFileUpload = async () => {
+    if (clientFiles.length === 0) {
+      alert("Please select a CSV/XLSX file first.");
+      return;
+    }
+
+    const file = clientFiles[0];
+
+    try {
+      console.log("Uploading file:", file.name);
+
+      const result = await uploadExcelFile(file);
+
+      alert(`Uploaded ${result.rowsQueued} rows to the server.`);
+      console.log("Upload result:", result);
+
+    } catch (error) {
+      console.error("Upload failed:", error);
+      alert(error.message || "Upload failed. See console.");
+    }
+  };
+  //
   const handleSendMessage = async (e) => {
     e.preventDefault();
     
@@ -53,6 +77,9 @@ function App() {
     setIsLoading(true);
 
     try {
+      // Call RAG query first
+      const ragResult = await ragQuery(inputMessage);
+  
       // This is where the AI integration happens
       const response = await sendMessageToAI(inputMessage, messages);
       
@@ -191,6 +218,17 @@ function App() {
                 ))}
               </ul>
             )}
+            
+            {clientFiles.length > 0 && (
+              <button
+                onClick={handleClientFileUpload}
+                className="upload-button"
+                style={{ marginTop: "10px" }}
+              >
+                Upload to Backend
+              </button>
+            )}
+
           </div>
 
           <div className={`upload-section ${sidebarCollapsed ? 'hidden' : ''}`}>

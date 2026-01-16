@@ -72,4 +72,55 @@ export const saveChatSession = async (messages) => {
   }
 };
 
+
+/**
+ * Upload Excel/CSV file to backend
+ * @param {File} file   The uploaded file object from frontend input
+ */
+export const uploadExcelFile = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);      // REQUIRED — backend expects this key
+    formData.append("userId", "client-123"); // ADD THIS LINE
+
+
+    // DO NOT manually set Content-Type here
+    const response = await axios.post(
+      `${API_BASE_URL}/api/upload-excel`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error("Upload failed:", error);
+
+    if (error.response) {
+      throw new Error(error.response.data.error);
+    }
+    throw new Error("Unable to upload file.");
+  }
+};
+
+// RAG Query function
+export const ragQuery = async (question) => {
+  try {
+    const response = await api.post('/api/rag-query', {
+      question
+    });
+    return response.data;
+  } catch (error) {
+    console.error('RAG Query Error:', error);
+    if (error.response) {
+      throw new Error(error.response.data.error || 'Server error occurred');
+    } else if (error.request) {
+      throw new Error('No response from server. Please check your connection.');
+    } else {
+      throw new Error('Error sending request');
+    }
+  }
+};
+
 export default api;

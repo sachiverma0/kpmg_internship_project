@@ -1,0 +1,18 @@
+[33m41b9f48[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32maj_branch[m[33m)[m Removed secrets from commit
+[33me09aa76[m Remove local.settings.json from repo
+[33m1d92b21[m Updated backend and functions with Cosmos DB integration
+[33mf622996[m[33m ([m[1;31morigin/sfrontend[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32msfrontend[m[33m, [m[1;32mmain[m[33m)[m ci: add Azure Static Web Apps workflow file on-behalf-of: @Azure opensource@microsoft.com
+[33m3ac3699[m Creating backend folder
+[33m96b28c4[m Creating backend folder
+[33mf446cad[m setting up read.me for setup process
+[33ma390572[m Merge branch 'aiconnect', remote-tracking branch 'origin' into sfrontend
+[33m8c60ce5[m changed settings icon and textbox colors
+[33mee3e77d[m changed colors and formatting and added kpmg logo
+[33m6ab8783[m[33m ([m[1;31morigin/aiconnect[m[33m, [m[1;32maiconnect[m[33m)[m Combining AI interface to frontend
+[33m6afc5ae[m added a section to upload client fund data and compliance policy documents
+[33m940c076[m Added pfp customization
+[33m3fb64f7[m Fixing project booting
+[33mcc96791[m Mving package.json to correct dir
+[33mb26d424[m[33m ([m[1;31morigin/jfrontend[m[33m)[m Update README.md
+[33md708543[m basic frontend
+[33mf9279e9[m Create README.md
