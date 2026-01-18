@@ -50,7 +50,7 @@ function App() {
 
       const result = await uploadExcelFile(file);
 
-      alert(`Uploaded ${result.rowsQueued} rows to the server.`);
+      alert(`Uploaded ${result.rowsProcessed || result.rowsQueued} rows to the server.`);
       console.log("Upload result:", result);
 
     } catch (error) {
@@ -77,16 +77,23 @@ function App() {
     setIsLoading(true);
 
     try {
-      // Call RAG query first
+      // Call RAG query to get context from uploaded documents
       const ragResult = await ragQuery(inputMessage);
   
-      // This is where the AI integration happens
-      const response = await sendMessageToAI(inputMessage, messages);
+      // Use RAG answer if available, otherwise fall back to regular chat
+      let assistantContent;
+      if (ragResult && ragResult.answer) {
+        assistantContent = ragResult.answer;
+      } else {
+        // Fallback to regular chat if no RAG results
+        const response = await sendMessageToAI(inputMessage, messages);
+        assistantContent = response.message;
+      }
       
       const assistantMessage = {
         id: Date.now() + 1,
         role: 'assistant',
-        content: response.message,
+        content: assistantContent,
         timestamp: new Date().toISOString()
       };
 

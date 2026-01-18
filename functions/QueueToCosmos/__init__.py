@@ -26,12 +26,16 @@ def _pk_field_name(path: str) -> str:
     return path.lstrip("/")
 
 def main(myQueueItem: str) -> None:
-    logging.info("Queue item received: %s", myQueueItem)
+    logging.info("=== Queue item received ===")
+    logging.info("Raw message: %s", myQueueItem)
+    logging.info("Message type: %s", type(myQueueItem))
+    logging.info("Message length: %d", len(myQueueItem) if isinstance(myQueueItem, str) else 0)
     logging.info("Cosmos: %s / %s | PK path: %s", DB_NAME, CONTAINER_NAME, PK_PATH)
 
     # Parse message
     try:
         msg = json.loads(myQueueItem)
+        logging.info("Successfully parsed JSON message")
     except (json.JSONDecodeError, TypeError) as e:
         logging.exception("Queue message is not valid JSON: %s", myQueueItem)
         raise
@@ -73,10 +77,11 @@ def main(myQueueItem: str) -> None:
         container.delete_item(item=document["id"], partition_key=pk_value)
         logging.info("Deleted document: %s (PK %s=%s)", document["id"], pk_field, pk_value)
     else:
+        # First upsert the document without embedding
         container.upsert_item(document)
         logging.info("Upserted document: %s (PK %s=%s)", document["id"], pk_field, document.get(pk_field))
         
-        # Create embedding from content
+        # Try to create embedding from content (non-blocking)
         if "content" in document:
             try:
                 # Truncate content to 8000 chars to avoid embedding API limits
@@ -85,6 +90,8 @@ def main(myQueueItem: str) -> None:
                 if not content_for_embedding.strip():
                     logging.warning("Document %s has empty content after truncation", document["id"])
                 else:
+                    logging.info("Creating embedding for document: %s (content length: %d)", document["id"], len(content_for_embedding))
+                    
                     emb = openai_client.embeddings.create(
                         model=os.environ.get("AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT", "text-embedding-ada-002"),
                         input=content_for_embedding
@@ -95,10 +102,11 @@ def main(myQueueItem: str) -> None:
                     
                     # Update document with embedding
                     container.upsert_item(document)
-                    logging.info("Updated document with embedding: %s", document["id"])
+                    logging.info("Successfully updated document with embedding: %s", document["id"])
             except Exception as e:
-                logging.error("Failed to create embedding for %s: %s", document["id"], str(e))
-                # Still keep the document in Cosmos even if embedding fails
+                logging.error("Failed to create embedding for document %s: %s", document["id"], str(e))
+                # Document is already saved without embedding, so we don't fail here
+                logging.info("Document %s saved to Cosmos DB without embedding due to error", document["id"])
         else:
-            logging.warning("Document %s has no content field", document["id"])
+            logging.warning("Document %s has no content field for embedding", document["id"])
 

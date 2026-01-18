@@ -84,9 +84,9 @@ export const uploadExcelFile = async (file) => {
     formData.append("userId", "client-123"); // ADD THIS LINE
 
 
-    // DO NOT manually set Content-Type here
+    // Use direct endpoint to bypass queue issues
     const response = await axios.post(
-      `${API_BASE_URL}/api/upload-excel`,
+      `${API_BASE_URL}/api/upload-excel-direct`,
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },

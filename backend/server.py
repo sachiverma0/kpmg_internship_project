@@ -5,6 +5,7 @@ import os
 import json
 import uuid
 import base64
+import time
 import pandas as pd
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
@@ -249,14 +250,149 @@ def upload_excel():
                 }
             }
 
-            queue_client.send_message(json.dumps(message))
-            queued_ids.append(row_id)
+            # Ensure valid JSON serialization
+            try:
+                message_json = json.dumps(message)
+                queue_client.send_message(message_json)
+                queued_ids.append(row_id)
+            except (TypeError, ValueError) as e:
+                logging.error(f"Failed to serialize row {row_id}: {str(e)}")
+                return jsonify({
+                    "error": f"Row {row_id} contains invalid data for JSON: {str(e)}"
+                }), 400
 
         return jsonify({
             "status": "queued",
             "rowsQueued": len(queued_ids),
             "ids": queued_ids
         }), 202
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/upload-excel-direct", methods=["POST"])
+def upload_excel_direct():
+    """
+    Upload CSV/XLSX and write DIRECTLY to Cosmos DB (bypass queue).
+    This avoids queue encoding issues.
+    Deletes existing documents for the user before uploading to prevent data accumulation.
+    """
+    if not container:
+        return jsonify({"error": "Cosmos DB not configured"}), 500
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded (must be 'file')."}), 400
+
+    file = request.files["file"]
+    filename = (file.filename or "").lower()
+    global_userId = request.form.get("userId") or request.args.get("userId")
+
+    try:
+        # DELETE EXISTING DOCUMENTS FOR THIS USER FIRST
+        if global_userId:
+            try:
+                delete_query = "SELECT c.id FROM c WHERE c.userId = @userId"
+                existing_docs = list(container.query_items(
+                    query=delete_query,
+                    parameters=[{"name": "@userId", "value": global_userId}],
+                    enable_cross_partition_query=True
+                ))
+                
+                deleted_count = 0
+                for doc in existing_docs:
+                    container.delete_item(item=doc["id"], partition_key=global_userId)
+                    deleted_count += 1
+                
+                print(f"Deleted {deleted_count} existing documents for user {global_userId}")
+            except Exception as del_err:
+                print(f"Warning: Failed to delete existing documents: {del_err}")
+
+        # Read CSV or XLSX
+        if filename.endswith(".csv"):
+            df = pd.read_csv(file)
+        elif filename.endswith(".xlsx"):
+            df = pd.read_excel(file, engine="openpyxl")
+        else:
+            return jsonify({"error": "Only .csv or .xlsx files supported."}), 400
+
+        processed_ids = []
+        failed_rows = []
+
+        for idx, row in df.iterrows():
+            try:
+                # Generate ID
+                if "id" in df.columns and pd.notna(row.get("id")):
+                    row_id = str(row["id"])
+                else:
+                    row_id = str(uuid.uuid4())
+
+                # Get userId
+                if "userId" in df.columns and pd.notna(row.get("userId")):
+                    user_id = str(row["userId"])
+                elif global_userId:
+                    user_id = global_userId
+                else:
+                    failed_rows.append(f"Row {idx}: missing userId")
+                    continue
+
+                # Generate title
+                if "title" in df.columns and pd.notna(row.get("title")):
+                    title = str(row["title"])
+                else:
+                    title = f"Record {row_id}"
+
+                # Generate content
+                if "content" in df.columns and pd.notna(row.get("content")):
+                    content = str(row["content"])
+                else:
+                    content = "\n".join(
+                        f"{col}: {row[col]}"
+                        for col in df.columns
+                        if col != "userId" and pd.notna(row[col])
+                    )
+
+                # Build document (no truncation - each row stored separately)
+                document = {
+                    "id": row_id,
+                    "userId": user_id,
+                    "title": title,
+                    "content": content,
+                    "version": "v1",
+                    "sourceFile": filename  # Store the filename
+                }
+
+                # Write to Cosmos DB
+                container.upsert_item(document)
+
+                # Create embedding
+                if content.strip():
+                    try:
+                        emb = client.embeddings.create(
+                            model=os.getenv("AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT"),
+                            input=content
+                        )
+                        document["embedding"] = emb.data[0].embedding
+                        container.upsert_item(document)
+                        # Add delay to avoid rate limiting (0.1 seconds between calls)
+                        time.sleep(0.1)
+                    except Exception as emb_err:
+                        # Log embedding errors but continue
+                        print(f"[Embedding Error] Row {idx} (ID: {row_id}): {str(emb_err)}")
+                        failed_rows.append(f"Row {idx}: embedding failed - {str(emb_err)}")
+
+                processed_ids.append(row_id)
+
+            except Exception as row_err:
+                failed_rows.append(f"Row {idx}: {str(row_err)}")
+
+        return jsonify({
+            "status": "completed",
+            "rowsProcessed": len(processed_ids),
+            "rowsFailed": len(failed_rows),
+            "ids": processed_ids,
+            "errors": failed_rows if failed_rows else None
+        }), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -276,9 +412,9 @@ def rag_query():
         input=question
     ).data[0].embedding
 
-    # 2. Query Cosmos DB for closest documents (simple query first)
+    # 2. Query Cosmos DB for ALL documents with embeddings
     query = """
-    SELECT TOP 5 c.id, c.title, c.content
+    SELECT c.id, c.title, c.content, c.sourceFile
     FROM c
     WHERE IS_DEFINED(c.embedding)
     """
@@ -295,15 +431,19 @@ def rag_query():
     if not items:
         return jsonify({"error": "No documents with embeddings found in Cosmos DB. Please ingest documents first."}), 400
 
-    # 3. Combine retrieved content
-    context = "\n\n".join([f"{x['title']}:\n{x['content']}" for x in items])
+    # 3. Combine retrieved content with source file info
+    context_parts = []
+    for x in items:
+        source = x.get('sourceFile', x['title'])
+        context_parts.append(f"[Source: {source}]\n{x['content']}")
+    context = "\n\n".join(context_parts)
 
     # 4. Ask GPT‑4.2 with context
     answer = client.chat.completions.create(
         model=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
         messages=[
-            {"role": "system", "content": "You are a RAG assistant. Always cite from context."},
-            {"role": "user", "content": f"Question: {question}\n\nContext:\n{context}\n\nAnswer using ONLY the context."}
+            {"role": "system", "content": "You are a RAG assistant. Always cite sources by their filename when referencing information."},
+            {"role": "user", "content": f"Question: {question}\n\nContext:\n{context}\n\nAnswer using ONLY the context above. When citing sources, use the [Source: filename] format shown in the context."}
         ]
     ).choices[0].message.content
 
