@@ -96,4 +96,98 @@ export const saveChatSession = async (messages) => {
   }
 };
 
+
+/**
+ * Upload Excel/CSV file to backend
+ * @param {File} file   The uploaded file object from frontend input
+ */
+export const uploadExcelFile = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);      // REQUIRED — backend expects this key
+
+    // Use direct endpoint to bypass queue issues
+    const response = await api.post(
+      '/api/upload-excel-direct',
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error("Upload failed:", error);
+
+    if (error.response) {
+      throw new Error(error.response.data.error);
+    }
+    throw new Error("Unable to upload file.");
+  }
+};
+
+// RAG Query function
+export const ragQuery = async (question) => {
+  try {
+    const response = await api.post('/api/rag-query', {
+      question
+    });
+    return response.data;
+  } catch (error) {
+    console.error('RAG Query Error:', error);
+    if (error.response) {
+      throw new Error(error.response.data.error || 'Server error occurred');
+    } else if (error.request) {
+      throw new Error('No response from server. Please check your connection.');
+    } else {
+      throw new Error('Error sending request');
+    }
+  }
+};
+
+/**
+ * Get uploaded files for a user
+ */
+export const getUploadedFiles = async () => {
+  try {
+    const response = await api.get('/api/get-uploaded-files');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching uploaded files:', error);
+    return { csvFiles: [], policyFiles: [] };
+  }
+};
+
+/**
+ * Upload policy documents (PDF, DOCX, DOC, TXT) to backend
+ * @param {File[]} files - Array of policy document files
+ */
+export const uploadPolicyDocuments = async (files) => {
+  try {
+    const formData = new FormData();
+    
+    // Add all files
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
+
+    const response = await api.post(
+      '/api/upload-policy-documents',
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error("Policy document upload failed:", error);
+
+    if (error.response) {
+      throw new Error(error.response.data.error || "Upload failed");
+    }
+    throw new Error("Unable to upload policy documents.");
+  }
+};
+
 export default api;

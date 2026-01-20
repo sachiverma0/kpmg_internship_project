@@ -56,6 +56,35 @@
   word-wrap: break-word;
 }
 
+.message-sources {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #444;
+  font-size: 0.875rem;
+}
+
+.sources-label {
+  color: #a0a0a0;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.sources-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  color: #7dd3fc;
+}
+
+.sources-list li {
+  padding: 0.25rem 0;
+}
+
+.sources-list li::before {
+  content: "• ";
+  margin-right: 0.5rem;
+}
+
 .message-timestamp {
   font-size: 0.75rem;
   color: #8e8ea0;

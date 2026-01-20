@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './App.css';
 import ChatMessage from './components/ChatMessage';
-import { sendMessageToAI } from './services/api';
+import { sendMessageToAI, uploadExcelFile, ragQuery, uploadPolicyDocuments, getUploadedFiles } from './services/api';
 import { MsalProvider, useMsal } from "@azure/msal-react";
 import { msalInstance } from "./msalConfig";
 import AuthenticationComponent, { useBypassAuth } from './components/AuthenticationComponent';
@@ -11,13 +11,16 @@ function AppContent() {
   const bypassAuthContext = useBypassAuth();
   const bypassAuth = bypassAuthContext?.bypassAuth;
   const setBypassAuth = bypassAuthContext?.setBypassAuth;
+
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [selectedColor, setSelectedColor] = useState('blue');
   const [showSettings, setShowSettings] = useState(false);
   const [clientFiles, setClientFiles] = useState([]);
+  const [uploadedClientFiles, setUploadedClientFiles] = useState([]);
   const [clientDragActive, setClientDragActive] = useState(false);
   const [policyFiles, setPolicyFiles] = useState([]);
+  const [uploadedPolicyFiles, setUploadedPolicyFiles] = useState([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
@@ -32,6 +35,20 @@ function AppContent() {
   }, [messages]);
 
   useEffect(() => {
+    // Fetch existing uploaded files when component mounts
+    const fetchFiles = async () => {
+      const files = await getUploadedFiles();
+      if (files.csvFiles.length > 0) {
+        setUploadedClientFiles(files.csvFiles.map(f => ({ name: f.name })));
+      }
+      if (files.policyFiles.length > 0) {
+        setUploadedPolicyFiles(files.policyFiles.map(f => ({ name: f.name })));
+      }
+    };
+    fetchFiles();
+  }, []);
+
+  useEffect(() => {
     function handleClickOutside(e) {
       if (showSettings && settingsRef.current && !settingsRef.current.contains(e.target) && !e.target.closest('.settings-button')) {
         setShowSettings(false);
@@ -41,6 +58,56 @@ function AppContent() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showSettings]);
+
+  const handleClientFileUpload = async () => {
+    if (clientFiles.length === 0) {
+      alert("Please select a CSV/XLSX file first.");
+      return;
+    }
+
+    const file = clientFiles[0];
+
+    try {
+      console.log("Uploading file:", file.name);
+
+      const result = await uploadExcelFile(file);
+
+      alert(`Uploaded ${result.rowsProcessed || result.rowsQueued} rows to the server.`);
+      console.log("Upload result:", result);
+      
+      // Store uploaded files and clear selection
+      setUploadedClientFiles([file]);
+      setClientFiles([]);
+
+    } catch (error) {
+      console.error("Upload failed:", error);
+      alert(error.message || "Upload failed. See console.");
+    }
+  };
+
+  const handlePolicyDocumentUpload = async () => {
+    if (policyFiles.length === 0) {
+      alert("Please select policy document files first.");
+      return;
+    }
+
+    try {
+      console.log("Uploading policy documents:", policyFiles.map(f => f.name));
+
+      const result = await uploadPolicyDocuments(policyFiles);
+
+      alert(`Uploaded ${result.filesProcessed} policy document(s) to the database.`);
+      console.log("Upload result:", result);
+      
+      // Store uploaded files and clear selection
+      setUploadedPolicyFiles(policyFiles);
+      setPolicyFiles([]);
+
+    } catch (error) {
+      console.error("Policy document upload failed:", error);
+      alert(error.message || "Upload failed. See console.");
+    }
+  };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -60,13 +127,23 @@ function AppContent() {
     setIsLoading(true);
 
     try {
-      // This is where the AI integration happens
-      const response = await sendMessageToAI(inputMessage, messages);
+      // Call RAG query to get context from uploaded documents
+      const ragResult = await ragQuery(inputMessage);
+  
+      // Use RAG answer if available, otherwise fall back to regular chat
+      let assistantContent;
+      if (ragResult && ragResult.answer) {
+        assistantContent = ragResult.answer;
+      } else {
+        // Fallback to regular chat if no RAG results
+        const response = await sendMessageToAI(inputMessage, messages);
+        assistantContent = response.message;
+      }
       
       const assistantMessage = {
         id: Date.now() + 1,
         role: 'assistant',
-        content: response.message,
+        content: assistantContent,
         timestamp: new Date().toISOString()
       };
 
@@ -132,10 +209,8 @@ function AppContent() {
   };
 
   return (
-    <MsalProvider instance={msalInstance}>
-      <AuthenticationComponent>
-        <div className="app">
-          <header className="app-header">
+    <div className="app">
+      <header className="app-header">
         <div className="header-left">
           <img src="/kpmg_logo.png" alt="KPMG" className="header-logo" />
           <span className="header-title">Client Compliance Tool</span>
@@ -213,6 +288,28 @@ function AppContent() {
                 ))}
               </ul>
             )}
+            
+            {clientFiles.length > 0 && (
+              <button
+                onClick={handleClientFileUpload}
+                className="upload-button"
+                style={{ marginTop: "10px" }}
+              >
+                Upload to Backend
+              </button>
+            )}
+
+            {uploadedClientFiles.length > 0 && clientFiles.length === 0 && (
+              <div>
+                <p style={{ marginTop: "10px", fontSize: "0.9em", color: "#666" }}>Uploaded files:</p>
+                <ul className="file-list">
+                  {uploadedClientFiles.map((f, i) => (
+                    <li key={i}>{f.name}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
           </div>
 
           <div className={`upload-section ${sidebarCollapsed ? 'hidden' : ''}`}>
@@ -254,6 +351,27 @@ function AppContent() {
                   <li key={i}>{f.name}</li>
                 ))}
               </ul>
+            )}
+
+            {policyFiles.length > 0 && (
+              <button
+                onClick={handlePolicyDocumentUpload}
+                className="upload-button"
+                style={{ marginTop: "10px" }}
+              >
+                Upload to Backend
+              </button>
+            )}
+
+            {uploadedPolicyFiles.length > 0 && policyFiles.length === 0 && (
+              <div>
+                <p style={{ marginTop: "10px", fontSize: "0.9em", color: "#666" }}>Uploaded files:</p>
+                <ul className="file-list">
+                  {uploadedPolicyFiles.map((f, i) => (
+                    <li key={i}>{f.name}</li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         </aside>
@@ -303,9 +421,7 @@ function AppContent() {
         </form>
         </div>
       </div>
-      </div>
-      </AuthenticationComponent>
-    </MsalProvider>
+    </div>
   );
 }
 

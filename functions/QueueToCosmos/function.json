@@ -1,0 +1,15 @@
+
+{
+  "scriptFile": "__init__.py",
+  "bindings": [
+    {
+      "name": "myQueueItem",
+      "type": "queueTrigger",
+      "direction": "in",
+      "queueName": "myqueue-items",
+      "connection": "AzureWebJobsStorage",
+      "cardinality": "One",
+      "dataType": "string"
+    }
+  ]
+}

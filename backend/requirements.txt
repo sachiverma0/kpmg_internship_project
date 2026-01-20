@@ -3,3 +3,7 @@ Flask-CORS>=4.0.0
 python-dotenv>=1.0.0
 openai>=1.50.0
 PyJWT>=2.8.0
+pandas
+python-docx
+PyPDF2
+azure-cosmos
